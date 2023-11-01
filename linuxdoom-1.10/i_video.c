@@ -83,13 +83,6 @@ int		X_shmeventtype;
 boolean		grabMouse;
 int		doPointerWarp = POINTER_WARP_COUNTDOWN;
 
-// Blocky mode,
-// replace each 320x200 pixel with multiply*multiply pixels.
-// According to Dave Taylor, it still is a bonehead thing
-// to use ....
-static int	multiply=1;
-
-
 //
 //  Translates the key currently in X_event
 //
@@ -346,6 +339,17 @@ void I_UpdateNoBlit (void)
     // what is this?
 }
 
+// scale an src image to dst image. dst image's dimensions must be at least as large as src's dimensions.
+
+void scaleUpImage(byte* src, int src_w, int src_h, char* dst, int dst_w, int dst_h) {
+
+        for(int y = 0; y < dst_h; y++) {
+                for(int x = 0; x < dst_w; x++) {
+                        dst[x + y*dst_w] = src[x * src_w / dst_w + y * src_h / dst_h * src_w]; 
+                }
+	}
+}
+
 //
 // I_FinishUpdate
 //
@@ -373,112 +377,7 @@ void I_FinishUpdate (void)
     
     }
 
-    // scales the screen size before blitting it
-    if (multiply == 2)
-    {
-	unsigned int *olineptrs[2];
-	unsigned int *ilineptr;
-	int x, y, i;
-	unsigned int twoopixels;
-	unsigned int twomoreopixels;
-	unsigned int fouripixels;
-
-	ilineptr = (unsigned int *) (screens[0]);
-	for (i=0 ; i<2 ; i++)
-	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
-
-	y = SCREENHEIGHT;
-	while (y--)
-	{
-	    x = SCREENWIDTH;
-	    do
-	    {
-		fouripixels = *ilineptr++;
-		twoopixels =	(fouripixels & 0xff000000)
-		    |	((fouripixels>>8) & 0xffff00)
-		    |	((fouripixels>>16) & 0xff);
-		twomoreopixels =	((fouripixels<<16) & 0xff000000)
-		    |	((fouripixels<<8) & 0xffff00)
-		    |	(fouripixels & 0xff);
-#ifdef __BIG_ENDIAN__
-		*olineptrs[0]++ = twoopixels;
-		*olineptrs[1]++ = twoopixels;
-		*olineptrs[0]++ = twomoreopixels;
-		*olineptrs[1]++ = twomoreopixels;
-#else
-		*olineptrs[0]++ = twomoreopixels;
-		*olineptrs[1]++ = twomoreopixels;
-		*olineptrs[0]++ = twoopixels;
-		*olineptrs[1]++ = twoopixels;
-#endif
-	    } while (x-=4);
-	    olineptrs[0] += X_width/4;
-	    olineptrs[1] += X_width/4;
-	}
-
-    }
-    else if (multiply == 3)
-    {
-	unsigned int *olineptrs[3];
-	unsigned int *ilineptr;
-	int x, y, i;
-	unsigned int fouropixels[3];
-	unsigned int fouripixels;
-
-	ilineptr = (unsigned int *) (screens[0]);
-	for (i=0 ; i<3 ; i++)
-	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
-
-	y = SCREENHEIGHT;
-	while (y--)
-	{
-	    x = SCREENWIDTH;
-	    do
-	    {
-		fouripixels = *ilineptr++;
-		fouropixels[0] = (fouripixels & 0xff000000)
-		    |	((fouripixels>>8) & 0xff0000)
-		    |	((fouripixels>>16) & 0xffff);
-		fouropixels[1] = ((fouripixels<<8) & 0xff000000)
-		    |	(fouripixels & 0xffff00)
-		    |	((fouripixels>>8) & 0xff);
-		fouropixels[2] = ((fouripixels<<16) & 0xffff0000)
-		    |	((fouripixels<<8) & 0xff00)
-		    |	(fouripixels & 0xff);
-#ifdef __BIG_ENDIAN__
-		*olineptrs[0]++ = fouropixels[0];
-		*olineptrs[1]++ = fouropixels[0];
-		*olineptrs[2]++ = fouropixels[0];
-		*olineptrs[0]++ = fouropixels[1];
-		*olineptrs[1]++ = fouropixels[1];
-		*olineptrs[2]++ = fouropixels[1];
-		*olineptrs[0]++ = fouropixels[2];
-		*olineptrs[1]++ = fouropixels[2];
-		*olineptrs[2]++ = fouropixels[2];
-#else
-		*olineptrs[0]++ = fouropixels[2];
-		*olineptrs[1]++ = fouropixels[2];
-		*olineptrs[2]++ = fouropixels[2];
-		*olineptrs[0]++ = fouropixels[1];
-		*olineptrs[1]++ = fouropixels[1];
-		*olineptrs[2]++ = fouropixels[1];
-		*olineptrs[0]++ = fouropixels[0];
-		*olineptrs[1]++ = fouropixels[0];
-		*olineptrs[2]++ = fouropixels[0];
-#endif
-	    } while (x-=4);
-	    olineptrs[0] += 2*X_width/4;
-	    olineptrs[1] += 2*X_width/4;
-	    olineptrs[2] += 2*X_width/4;
-	}
-
-    }
-    else if (multiply == 4)
-    {
-	// Broken. Gotta fix this some day.
-	void Expand4(unsigned *, double *);
-  	Expand4 ((unsigned *)(screens[0]), (double *) (image->data));
-    }
+	scaleUpImage(screens[0], SCREENWIDTH, SCREENHEIGHT, image->data, image->bytes_per_line,X_height);
 
     if (doShm)
     {
@@ -716,18 +615,6 @@ void I_InitGraphics(void)
 
     signal(SIGINT, (void (*)(int)) I_Quit);
 
-    if (M_CheckParm("-2"))
-	multiply = 2;
-
-    if (M_CheckParm("-3"))
-	multiply = 3;
-
-    if (M_CheckParm("-4"))
-	multiply = 4;
-
-    X_width = SCREENWIDTH * multiply;
-    X_height = SCREENHEIGHT * multiply;
-
     // check for command-line display name
     if ( (pnum=M_CheckParm("-disp")) ) // suggest parentheses around assignment
 	displayname = myargv[pnum+1];
@@ -804,6 +691,9 @@ void I_InitGraphics(void)
 
     attribs.colormap = X_cmap;
     attribs.border_pixel = 0;
+
+	X_height = XDisplayHeight(X_display, X_screen);
+	X_width = XDisplayWidth(X_display, X_screen);
 
     // create the main window
     X_mainWindow = XCreateWindow(	X_display,
@@ -908,9 +798,6 @@ void I_InitGraphics(void)
 
     }
 
-    if (multiply == 1)
-	screens[0] = (unsigned char *) (image->data);
-    else
 	screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT);
 
 }
