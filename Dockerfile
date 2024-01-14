@@ -5,6 +5,7 @@ RUN apt-get install -y build-essential
 RUN apt-get -y install libx11-dev xserver-xorg-dev xorg-dev
 RUN apt install -y libx11-dev:i386
 RUN apt install -y libxext-dev:i386
+RUN apt install -y libxnsl-dev:i386
 RUN apt-get install -y gcc-multilib 
 RUN apt-get install -y git
 RUN apt-get install -y xserver-xephyr
