@@ -9,6 +9,13 @@ CC=  gcc  # gcc or g++
 CFLAGS= -g -Wall -DNORMALUNIX -DLINUX # -DUSEASM 
 LIBS=-lXext -lX11 -lm
 
+OSNAME := $(shell uname)
+
+ifeq ($(OSNAME), Darwin)
+	CFLAGS += -I/opt/X11/include
+	LDFLAGS += -L/opt/X11/lib
+endif
+
 # subdirectory for objects
 O=linux
 

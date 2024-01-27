@@ -22,8 +22,6 @@
 #ifndef	_VALUES_H
 #define	_VALUES_H	1
 
-#include <features.h>
-
 #include <limits.h>
 
 #define _TYPEBITS(type)	(sizeof (type) * CHAR_BIT)
