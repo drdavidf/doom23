@@ -83,11 +83,14 @@ OBJS=				\
 		$(O)/info.o				\
 		$(O)/sounds.o
 
-all:	 $(O)/linuxxdoom
+all:	 linux $(O)/linuxxdoom 
 
 clean:
 	rm -f *.o *~ *.flc
-	rm -f linux/*
+	rm $(OBJS) $(O)/linuxxdoom $(O)/i_main.o
+
+linux:
+	mkdir linux
 
 $(O)/linuxxdoom:	$(OBJS) $(O)/i_main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \
