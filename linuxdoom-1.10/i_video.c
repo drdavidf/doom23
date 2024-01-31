@@ -71,6 +71,8 @@ XImage*		image;
 int		X_width;
 int		X_height;
 
+static XColor	colors[256];
+
 // MIT SHared Memory extension.
 boolean		doShm;
 
@@ -342,10 +344,16 @@ void I_UpdateNoBlit (void)
 // scale an src image to dst image. dst image's dimensions must be at least as large as src's dimensions.
 
 void scaleUpImage(byte* src, int src_w, int src_h, char* dst, int dst_w, int dst_h) {
+	int c, color_index;
 
         for(int y = 0; y < dst_h; y++) {
-                for(int x = 0; x < dst_w; x++) {
-                        dst[x + y*dst_w] = src[x * src_w / dst_w + y * src_h / dst_h * src_w]; 
+                for(int x = 0; x < dst_w ; x+=4) {
+			color_index =  src[x * src_w / dst_w + y * src_h / dst_h * src_w]; 
+			dst[x + y * dst_w + 0] = colors[color_index].blue;
+
+			dst[x + y * dst_w + 1] = colors[color_index].green;
+
+			dst[x + y * dst_w + 2] = colors[color_index].red;
                 }
 	}
 }
@@ -432,47 +440,22 @@ void I_ReadScreen (byte* scr)
 //
 // Palette stuff.
 //
-static XColor	colors[256];
 
 void UploadNewPalette(Colormap cmap, byte *palette)
 {
 
     register int	i;
     register int	c;
-    static boolean	firstcall = true;
 
-#ifdef __cplusplus
-    if (X_visualinfo.c_class == PseudoColor && X_visualinfo.depth == 8)
-#else
-    if (X_visualinfo.class == PseudoColor && X_visualinfo.depth == 8)
-#endif
-	{
-	    // initialize the colormap
-	    if (firstcall)
-	    {
-		firstcall = false;
-		for (i=0 ; i<256 ; i++)
-		{
-		    colors[i].pixel = i;
-		    colors[i].flags = DoRed|DoGreen|DoBlue;
-		}
-	    }
-
-	    // set the X colormap entries
-	    for (i=0 ; i<256 ; i++)
-	    {
-		c = gammatable[usegamma][*palette++];
-		colors[i].red = (c<<8) + c;
-		c = gammatable[usegamma][*palette++];
-		colors[i].green = (c<<8) + c;
-		c = gammatable[usegamma][*palette++];
-		colors[i].blue = (c<<8) + c;
-	    }
-
-	    // store the colors to the current colormap
-	    XStoreColors(X_display, cmap, colors, 256);
-
-	}
+    for (i=0 ; i<256 ; i++)
+    {
+	c = gammatable[usegamma][*palette++];
+	colors[i].red = (c<<8) + c;
+	c = gammatable[usegamma][*palette++];
+	colors[i].green = (c<<8) + c;
+	c = gammatable[usegamma][*palette++];
+	colors[i].blue = (c<<8) + c;
+    }
 }
 
 //
@@ -655,8 +638,7 @@ void I_InitGraphics(void)
 
     // use the default visual 
     X_screen = DefaultScreen(X_display);
-    if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo))
-	I_Error("xdoom currently only supports 256-color PseudoColor screens");
+
     X_visual = X_visualinfo.visual;
 
     // check for the MITSHM extension
@@ -678,8 +660,7 @@ void I_InitGraphics(void)
     fprintf(stderr, "Using MITSHM extension\n");
 
     // create the colormap
-    X_cmap = XCreateColormap(X_display, RootWindow(X_display,
-						   X_screen), X_visual, AllocAll);
+	X_cmap = DefaultColormap(X_display, X_screen);
 
     // setup attributes for main window
     attribmask = CWEventMask | CWColormap | CWBorderPixel;
@@ -689,11 +670,13 @@ void I_InitGraphics(void)
 	// | PointerMotionMask | ButtonPressMask | ButtonReleaseMask
 	| ExposureMask;
 
+
     attribs.colormap = X_cmap;
+
     attribs.border_pixel = 0;
 
-	X_height = XDisplayHeight(X_display, X_screen);
-	X_width = XDisplayWidth(X_display, X_screen);
+	X_height = 400 ; //XDisplayHeight(X_display, X_screen);
+	X_width = 640; //XDisplayWidth(X_display, X_screen);
 
     // create the main window
     X_mainWindow = XCreateWindow(	X_display,
@@ -701,7 +684,7 @@ void I_InitGraphics(void)
 					x, y,
 					X_width, X_height,
 					0, // borderwidth
-					8, // depth
+					0, // depth
 					InputOutput,
 					X_visual,
 					attribmask,
@@ -749,7 +732,7 @@ void I_InitGraphics(void)
 	// create the image
 	image = XShmCreateImage(	X_display,
 					X_visual,
-					8,
+					DefaultDepth(X_display,X_screen),
 					ZPixmap,
 					0,
 					&X_shminfo,
@@ -758,20 +741,6 @@ void I_InitGraphics(void)
 
 	grabsharedmemory(image->bytes_per_line * image->height);
 
-
-	// UNUSED
-	// create the shared memory segment
-	// X_shminfo.shmid = shmget (IPC_PRIVATE,
-	// image->bytes_per_line * image->height, IPC_CREAT | 0777);
-	// if (X_shminfo.shmid < 0)
-	// {
-	// perror("");
-	// I_Error("shmget() failed in InitGraphics()");
-	// }
-	// fprintf(stderr, "shared memory id=%d\n", X_shminfo.shmid);
-	// attach to the shared memory segment
-	// image->data = X_shminfo.shmaddr = shmat(X_shminfo.shmid, 0, 0);
-	
 
 	if (!image->data)
 	{
@@ -788,13 +757,14 @@ void I_InitGraphics(void)
     {
 	image = XCreateImage(	X_display,
     				X_visual,
-    				8,
+				DefaultDepth(X_display,X_screen),
     				ZPixmap,
     				0,
-    				(char*)malloc(X_width * X_height),
+    				(char*)malloc(X_width * X_height * 4),
     				X_width, X_height,
-    				8,
-    				X_width );
+    				BitmapPad(X_display),
+    				0 );
+	
 
     }
 
