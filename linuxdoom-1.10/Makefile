@@ -6,7 +6,7 @@
 #
 CC=  gcc  # gcc or g++
 
-CFLAGS= -g -Wall -DNORMALUNIX -DLINUX # -DUSEASM 
+CFLAGS= -g -Wall -DNORMALUNIX -DLINUX -DSNDSERV # -DUSEASM 
 LIBS=-lXext -lX11 -lm
 
 OSNAME := $(shell uname)
